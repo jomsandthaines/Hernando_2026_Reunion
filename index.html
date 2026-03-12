@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Hernando Reunion 2026 Event App</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+margin:0;
+background:linear-gradient(120deg,#004aad,#007bff);
+color:white;
+text-align:center;
+}
+
+header{
+padding:20px;
+}
+
+header img{
+width:420px;
+max-width:90%;
+}
+
+nav{
+background:white;
+padding:10px;
+}
+
+nav button{
+padding:10px 15px;
+margin:5px;
+border:none;
+border-radius:6px;
+background:#004aad;
+color:white;
+font-weight:bold;
+}
+
+section{
+display:none;
+padding:20px;
+}
+
+.active{
+display:block;
+}
+
+input,select{
+padding:10px;
+margin:5px;
+width:220px;
+}
+
+video{
+border:4px solid white;
+border-radius:8px;
+}
+
+table{
+margin:auto;
+background:white;
+color:black;
+border-collapse:collapse;
+}
+
+td,th{
+border:1px solid #ccc;
+padding:8px 12px;
+}
+
+#wheel{
+margin:auto;
+border-radius:50%;
+border:10px solid gold;
+transition: transform 6s cubic-bezier(.17,.67,.83,.67);
+}
+
+.pointer{
+width:0;
+height:0;
+border-left:25px solid transparent;
+border-right:25px solid transparent;
+border-bottom:45px solid yellow;
+margin:auto;
+}
+
+.badgeSheet{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:15px;
+margin-top:20px;
+}
+
+.badge{
+border:2px solid black;
+background:white;
+color:black;
+padding:10px;
+text-align:center;
+height:180px;
+}
+
+.badge img{
+width:60px;
+height:60px;
+border-radius:50%;
+}
+
+@media print{
+
+nav,.controls{
+display:none;
+}
+
+body{
+background:white;
+color:black;
+}
+
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<img src="logo.png">
+</header>
+
+<nav>
+
+<button onclick="show('register')">Register</button>
+<button onclick="show('attendees')">Attendees</button>
+<button onclick="show('raffle')">Raffle</button>
+<button onclick="show('tickets')">Tickets</button>
+<button onclick="show('badges')">Badges</button>
+<button onclick="show('leaderboard')">Leaderboard</button>
+<button onclick="show('qr')">QR</button>
+
+</nav>
+
+<div class="controls">
+
+<button onclick="resetAttendees()">Reset Attendees</button>
+
+<button onclick="resetRaffle()">Reset Raffle</button>
+
+</div>
+
+<section id="register" class="active">
+
+<h2>Register Attendee</h2>
+
+<input id="name" placeholder="Name">
+
+<select id="family">
+<option>Demetrio</option>
+<option>Ben</option>
+<option>Juan</option>
+<option>Remedios</option>
+<option>Ponciano</option>
+<option>Amada</option>
+<option>Eupronio</option>
+<option>Sofia</option>
+<option>Butch</option>
+</select>
+
+<select id="country">
+<option>Philippines</option>
+<option>USA</option>
+<option>Canada</option>
+<option>Other</option>
+</select>
+
+<br><br>
+
+<video id="camera" width="220" autoplay></video>
+
+<br>
+
+<button onclick="takePhoto()">Capture Photo</button>
+
+<br>
+
+<canvas id="photoCanvas" width="220" height="160"></canvas>
+
+<br>
+
+<button onclick="register()">Register</button>
+
+</section>
+
+<section id="attendees">
+
+<h2>Attendee List</h2>
+
+<button onclick="exportExcel()">Export Excel</button>
+
+<button onclick="downloadPhotos()">Download Photos</button>
+
+<button onclick="document.getElementById('excelFile').click()">Import Excel</button>
+
+<input type="file" id="excelFile" accept=".xlsx,.xls" style="display:none">
+
+<table id="table">
+
+<tr>
+<th>Ticket</th>
+<th>Name</th>
+<th>Family</th>
+<th>Country</th>
+</tr>
+
+</table>
+
+</section>
+
+<section id="raffle">
+
+<h2>Raffle Wheel</h2>
+
+<div class="pointer"></div>
+
+<canvas id="wheel" width="300" height="300"></canvas>
+
+<br>
+
+<button onclick="spin()">SPIN</button>
+
+<h2 id="winner"></h2>
+
+</section>
+
+<section id="tickets">
+
+<h2>Raffle Tickets</h2>
+
+<button onclick="window.print()">Print Tickets</button>
+
+<div id="ticketList"></div>
+
+</section>
+
+<section id="badges">
+
+<h2>Badge Sheets</h2>
+
+<button onclick="window.print()">Print Badges</button>
+
+<div class="badgeSheet" id="badgeSheet"></div>
+
+</section>
+
+<section id="leaderboard">
+
+<h2>Family Attendance</h2>
+
+<table id="familyBoard"></table>
+
+<h2>Raffle Winners</h2>
+
+<table id="winnerBoard"></table>
+
+</section>
+
+<section id="qr">
+
+<h2>Scan QR to Register</h2>
+
+<div id="qrcode"></div>
+
+</section>
+
+<script>
+
+let attendees = JSON.parse(localStorage.getItem("hernando_data")) || []
+
+let winners = JSON.parse(localStorage.getItem("hernando_winners")) || []
+
+function save(){
+localStorage.setItem("hernando_data",JSON.stringify(attendees))
+localStorage.setItem("hernando_winners",JSON.stringify(winners))
+}
+
+function show(page){
+document.querySelectorAll("section").forEach(s=>s.classList.remove("active"))
+document.getElementById(page).classList.add("active")
+update()
+}
+
+let video=document.getElementById("camera")
+
+navigator.mediaDevices.getUserMedia({video:true})
+.then(stream=>{video.srcObject=stream})
+
+function takePhoto(){
+let canvas=document.getElementById("photoCanvas")
+let ctx=canvas.getContext("2d")
+ctx.drawImage(video,0,0,220,160)
+}
+
+function register(){
+
+let name=document.getElementById("name").value.trim()
+
+let family=document.getElementById("family").value
+
+let country=document.getElementById("country").value
+
+if(name==""){
+alert("Please enter a name")
+return
+}
+
+/* duplicate check */
+
+let duplicate = attendees.find(p => p.name.toLowerCase() === name.toLowerCase())
+
+if(duplicate){
+
+alert("This name is already registered.")
+
+return
+
+}
+
+let photo=document.getElementById("photoCanvas").toDataURL()
+
+let ticket=1000+attendees.length+1
+
+attendees.push({name,family,country,ticket,photo})
+
+save()
+
+alert("Registration successful! Ticket #" + ticket)
+
+/* clear form */
+
+document.getElementById("name").value=""
+
+let canvas=document.getElementById("photoCanvas")
+let ctx=canvas.getContext("2d")
+ctx.clearRect(0,0,220,160)
+
+update()
+
+}
+
+function resetAttendees(){
+
+if(confirm("Reset all attendees?")){
+
+attendees=[]
+localStorage.removeItem("hernando_data")
+update()
+
+}
+
+}
+
+function resetRaffle(){
+
+if(confirm("Reset raffle winners?")){
+
+winners=[]
+localStorage.removeItem("hernando_winners")
+update()
+
+}
+
+}
+
+function update(){
+
+let table=document.getElementById("table")
+
+if(table){
+
+table.innerHTML="<tr><th>Ticket</th><th>Name</th><th>Family</th><th>Country</th></tr>"
+
+attendees.forEach(p=>{
+table.innerHTML+=`<tr><td>${p.ticket}</td><td>${p.name}</td><td>${p.family}</td><td>${p.country}</td></tr>`
+})
+
+}
+
+/* raffle tickets */
+
+let tickets=""
+
+attendees.forEach(p=>{
+tickets+=`
+<div style="border:2px dashed white;padding:10px;margin:5px;display:inline-block">
+<img src="${p.photo}" width="60"><br>
+${p.name}<br>
+${p.country}<br>
+Ticket #${p.ticket}
+</div>`
+})
+
+let ticketBox=document.getElementById("ticketList")
+if(ticketBox) ticketBox.innerHTML=tickets
+
+/* badges */
+
+let badges=""
+
+attendees.forEach(p=>{
+badges+=`
+<div class="badge">
+<img src="${p.photo}">
+<br>
+<b>${p.name}</b>
+<br>
+${p.family}
+<br>
+${p.country}
+</div>`
+})
+
+let badgeSheet=document.getElementById("badgeSheet")
+if(badgeSheet) badgeSheet.innerHTML=badges
+
+drawWheel()
+updateLeaderboard()
+
+}
+
+function updateLeaderboard(){
+
+let familyCount={}
+
+attendees.forEach(p=>{
+familyCount[p.family]=(familyCount[p.family]||0)+1
+})
+
+let familyBoard=document.getElementById("familyBoard")
+
+familyBoard.innerHTML="<tr><th>Family</th><th>Members</th></tr>"
+
+Object.keys(familyCount).forEach(f=>{
+familyBoard.innerHTML+=`<tr><td>${f}</td><td>${familyCount[f]}</td></tr>`
+})
+
+let winnerBoard=document.getElementById("winnerBoard")
+
+winnerBoard.innerHTML="<tr><th>Name</th><th>Family</th><th>Country</th></tr>"
+
+winners.forEach(w=>{
+winnerBoard.innerHTML+=`<tr><td>${w.name}</td><td>${w.family}</td><td>${w.country}</td></tr>`
+})
+
+}
+
+function drawWheel(){
+
+let canvas=document.getElementById("wheel")
+let ctx=canvas.getContext("2d")
+
+ctx.clearRect(0,0,300,300)
+
+let total=attendees.length
+if(total==0)return
+
+let angle=2*Math.PI/total
+
+for(let i=0;i<total;i++){
+
+ctx.beginPath()
+ctx.moveTo(150,150)
+ctx.arc(150,150,150,i*angle,(i+1)*angle)
+
+ctx.fillStyle=i%2?"#ffcc00":"#ff6666"
+ctx.fill()
+
+ctx.save()
+ctx.translate(150,150)
+ctx.rotate(i*angle+angle/2)
+ctx.fillStyle="black"
+ctx.fillText(attendees[i].name,80,0)
+ctx.restore()
+
+}
+
+}
+
+let rotation=0
+
+function spin(){
+
+if(attendees.length==0){
+alert("No more attendees")
+return
+}
+
+let index=Math.floor(Math.random()*attendees.length)
+
+let spins=5+Math.floor(Math.random()*4)
+
+rotation+=(360*spins)+(360/attendees.length)*index
+
+document.getElementById("wheel").style.transform="rotate("+rotation+"deg)"
+
+setTimeout(()=>{
+
+let winner=attendees[index]
+
+alert("Winner: "+winner.name)
+
+winners.push(winner)
+
+attendees.splice(index,1)
+
+save()
+
+update()
+
+},6000)
+
+}
+
+new QRCode(document.getElementById("qrcode"),{
+text:window.location.href,
+width:200,
+height:200
+})
+
+update()
+
+</script>
+
+</body>
+</html>
